@@ -6,6 +6,8 @@ Queue and reorder messages, partition directed links, pause replicas, and inspec
 
 ![Causal Post workbench](docs/workbench.png)
 
+The main view includes one event lane per replica and arrows for recorded direct causal dependencies. Vertical position follows simulator operation order, not physical time. Click or keyboard-activate events to alternate comparison selections A and B. Queued messages and the composer sit beside the diagram; partitions and scenario files are in **Network & files**, and the full event log expands below.
+
 ## Run locally
 
 Requires Python 3.10+ to serve the interface. No packages, build step, account, or API key.

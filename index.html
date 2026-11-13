@@ -4,48 +4,66 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Causal Post</title>
-    <meta name="description" content="A hands-on logical-clock and message-ordering simulator." />
     <link rel="stylesheet" href="style.css" />
     <script type="module" src="app.js"></script>
   </head>
   <body>
     <a class="skip" href="#replicas">Skip to replicas</a>
     <header>
-      <a class="brand" href="./"><span class="mark">↗</span> CAUSAL POST</a
-      ><span class="tag">DISTRIBUTED SYSTEMS / LOCAL SIMULATION</span
-      ><a href="https://github.com/Michaelhoang8/causal-post">Source ↗</a>
+      <h1>Causal Post</h1>
+      <label
+        >Scenario<select id="scenario">
+          <option value="concurrent">Concurrent beginnings</option>
+          <option value="partition">A partitioned network</option>
+          <option value="reorder">Out-of-order delivery</option>
+        </select></label
+      >
+      <button id="settings-open">Network &amp; files</button>
+      <div class="totals">
+        <span><strong id="event-total">0</strong> events</span
+        ><span><strong id="pending-total">0</strong> in transit</span
+        ><span><strong id="partition-total">0</strong> broken links</span>
+      </div>
     </header>
     <main>
-      <section class="intro">
-        <div>
-          <p class="eyebrow">OBSERVE. DELAY. CONNECT.</p>
-          <h1>Messages<br />carry <em>history.</em></h1>
+      <section id="replicas" tabindex="-1" aria-labelledby="replica-title">
+        <div class="section-head">
+          <h2 id="replica-title">Replicas</h2>
+          <span id="vector-order"></span>
         </div>
-        <div class="intro-right">
-          <p>Control the delivery.<br />Discover the order underneath.</p>
-          <div class="totals">
-            <span><strong id="event-total">0</strong> events</span
-            ><span><strong id="pending-total">0</strong> in transit</span
-            ><span><strong id="partition-total">0</strong> broken links</span>
-          </div>
-        </div>
+        <div id="nodes" class="nodes"></div>
       </section>
       <div class="workspace">
-        <aside class="controls">
+        <section class="trace-panel">
           <div class="section-head">
-            <h2>Your experiment</h2>
-            <span>01</span>
+            <h2>Event sequence</h2>
+            <span>Operation order · not physical time</span>
           </div>
-          <label
-            >Scenario<select id="scenario">
-              <option value="concurrent">Concurrent beginnings</option>
-              <option value="partition">A partitioned network</option>
-              <option value="reorder">Out-of-order delivery</option>
-            </select></label
-          >
-          <p class="hint">
-            Loading a scenario replaces the current simulation. All activity stays in this browser.
-          </p>
+          <div class="sequence-scroll">
+            <svg
+              id="sequence"
+              role="group"
+              aria-label="Replica event sequence and direct causal dependencies"
+            ></svg>
+          </div>
+          <section class="comparison" aria-labelledby="comparison-title">
+            <div class="section-head">
+              <h2 id="comparison-title">Compare events</h2>
+              <span id="pick-next">Click an event to set A</span>
+            </div>
+            <div class="compare-selectors">
+              <label>Event A<select id="event-a"></select></label><span class="versus">↔</span
+              ><label>Event B<select id="event-b"></select></label>
+            </div>
+            <div id="comparison" role="status" aria-live="polite"></div>
+          </section>
+        </section>
+        <aside class="transit">
+          <div class="section-head">
+            <h2>In transit</h2>
+            <span>Manual delivery</span>
+          </div>
+          <div id="messages"></div>
           <form id="send-form">
             <h3>Compose a message</h3>
             <div class="pair">
@@ -54,88 +72,18 @@
             </div>
             <label
               >Label <small>optional</small
-              ><input
-                id="label"
-                maxlength="120"
-                placeholder="What is this message carrying?" /></label
+              ><input id="label" maxlength="120" placeholder="Message label" /></label
             ><button class="primary">Queue message <span>→</span></button>
           </form>
-          <details>
-            <summary>Partition a directed link</summary>
-            <div class="pair">
-              <label>From<select id="link-from"></select></label
-              ><label>To<select id="link-to"></select></label>
-            </div>
-            <button id="partition">Break this link</button>
-            <p class="hint">
-              Only this direction is blocked. Messages remain queued until you heal the link and
-              explicitly deliver them.
-            </p>
-            <div id="blocked"></div>
-          </details>
-          <details>
-            <summary>Scenario files & reset</summary>
-            <button id="export">Export replayable scenario ↓</button
-            ><label class="file"
-              >Import scenario JSON<input
-                id="import"
-                type="file"
-                accept=".json,application/json" /></label
-            ><label
-              >Nodes in a new scenario<select id="node-count">
-                <option>2</option>
-                <option selected>3</option>
-                <option>4</option>
-                <option>5</option>
-                <option>6</option>
-              </select></label
-            ><button id="clear">Start empty scenario</button>
-            <p class="hint">
-              Up to 200 events, 100 messages, and 512 commands. Exports include your event and
-              message labels.
-            </p>
-          </details>
-          <div id="notice" role="status" aria-live="polite">
-            Choose two events to compare their histories.
-          </div>
-          <p class="footnote">
-            This is a deterministic teaching model. No real network, consensus protocol, physical
-            clock, or automatic recovery is involved.
-          </p>
         </aside>
-        <div class="observations">
-          <section id="replicas" tabindex="-1" aria-labelledby="replica-title">
-            <div class="section-head">
-              <h2 id="replica-title">The replicas</h2>
-              <span id="vector-order"></span>
-            </div>
-            <div id="nodes" class="nodes"></div>
-          </section>
-          <section class="comparison" aria-labelledby="comparison-title">
-            <div class="section-head">
-              <h2 id="comparison-title">Compare two moments</h2>
-              <span>02</span>
-            </div>
-            <div class="compare-selectors">
-              <label>Event A<select id="event-a"></select></label><span class="versus">↔</span
-              ><label>Event B<select id="event-b"></select></label>
-            </div>
-            <div id="comparison" role="status" aria-live="polite"></div>
-          </section>
-          <section class="transit">
-            <div class="section-head">
-              <h2>In transit</h2>
-              <span>MANUAL DELIVERY</span>
-            </div>
-            <div id="messages"></div>
-          </section>
-        </div>
       </div>
-      <section class="history">
+      <p id="notice" role="status" aria-live="polite"></p>
+      <details class="history">
+        <summary>Event log</summary>
         <div class="section-head">
-          <h2>The causal trace</h2>
+          <h2>Causal trace</h2>
           <div>
-            <button id="export-events">Export event log ↓</button><span id="trace-count"></span>
+            <button id="export-events">Export event log</button><span id="trace-count"></span>
           </div>
         </div>
         <p class="hint">
@@ -162,7 +110,7 @@
           <button id="previous">Previous events</button><span id="page-range"></span
           ><button id="next">Next events</button>
         </div>
-      </section>
+      </details>
       <details class="guide">
         <summary>How to read the clocks</summary>
         <div>
@@ -194,9 +142,52 @@
           </p>
         </div>
       </details>
-      <footer>
-        <span>CAUSAL POST</span><span>Every delivery changes what a replica knows.</span>
-      </footer>
     </main>
+    <dialog id="settings-panel" aria-labelledby="settings-title">
+      <div class="section-head">
+        <h2 id="settings-title">Network &amp; files</h2>
+        <button id="settings-close">Close</button>
+      </div>
+      <details>
+        <summary>Partition a directed link</summary>
+        <div class="pair">
+          <label>From<select id="link-from"></select></label
+          ><label>To<select id="link-to"></select></label>
+        </div>
+        <button id="partition">Break this link</button>
+        <p class="hint">
+          Only this direction is blocked. Messages remain queued until you heal the link and
+          explicitly deliver them.
+        </p>
+        <div id="blocked"></div>
+      </details>
+      <details>
+        <summary>Scenario files & reset</summary>
+        <button id="export">Export replayable scenario</button
+        ><label class="file"
+          >Import scenario JSON<input
+            id="import"
+            type="file"
+            accept=".json,application/json" /></label
+        ><label
+          >Nodes in a new scenario<select id="node-count">
+            <option>2</option>
+            <option selected>3</option>
+            <option>4</option>
+            <option>5</option>
+            <option>6</option>
+          </select></label
+        ><button id="clear">Start empty scenario</button>
+        <p class="hint">
+          Up to 200 events, 100 messages, and 512 commands. Exports include your event and message
+          labels.
+        </p>
+      </details>
+      <p id="settings-notice" role="status"></p>
+      <p class="hint">
+        This simulator uses logical clocks and manual delivery. It does not connect to a real
+        network or implement consensus.
+      </p>
+    </dialog>
   </body>
 </html>

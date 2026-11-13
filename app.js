@@ -7,11 +7,14 @@ const escape = (value) =>
   );
 let sim = importScenario(scenarios.concurrent),
   page = 0,
-  revision = 0;
+  revision = 0,
+  nextComparison = 'a';
 const pageSize = 50;
 function notice(text, error = false) {
   $('notice').textContent = text;
   $('notice').className = error ? 'error' : '';
+  $('settings-notice').textContent = text;
+  $('settings-notice').className = error ? 'error' : '';
 }
 function download(name, value) {
   const url = URL.createObjectURL(
@@ -69,7 +72,102 @@ function renderNodes(state) {
     .join('');
   $('vector-order').textContent = 'VECTOR ORDER: ' + state.order.join(' / ');
 }
+function renderSequence(state) {
+  const root = $('sequence'),
+    ns = 'http://www.w3.org/2000/svg';
+  const make = (tag, attrs, text) => {
+    const n = document.createElementNS(ns, tag);
+    for (const [key, value] of Object.entries(attrs)) n.setAttribute(key, value);
+    if (text !== undefined) n.textContent = text;
+    return n;
+  };
+  const width = Math.max(620, state.order.length * 180),
+    height = Math.max(180, state.events.length * 34 + 70);
+  root.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  root.setAttribute('width', width);
+  root.setAttribute('height', height);
+  root.replaceChildren();
+  const positions = new Map(
+    state.events.map((e, i) => [
+      e.id,
+      {
+        x: 70 + (state.order.indexOf(e.node) * (width - 220)) / Math.max(1, state.order.length - 1),
+        y: 62 + i * 34,
+      },
+    ]),
+  );
+  const defs = make('defs', {}),
+    marker = make('marker', {
+      id: 'causal-arrow',
+      viewBox: '0 0 10 10',
+      refX: 9,
+      refY: 5,
+      markerWidth: 5,
+      markerHeight: 5,
+      orient: 'auto-start-reverse',
+    });
+  marker.append(make('path', { d: 'M 0 0 L 10 5 L 0 10 Z', fill: '#8799a3' }));
+  defs.append(marker);
+  root.append(defs);
+  state.order.forEach((id, index) => {
+    const x = 70 + (index * (width - 220)) / Math.max(1, state.order.length - 1);
+    root.append(
+      make('line', { x1: x, x2: x, y1: 40, y2: height - 10, class: 'lane' }),
+      make('text', { x, y: 24, 'text-anchor': 'middle', class: 'lane-label' }, id),
+    );
+  });
+  for (const e of state.events) {
+    const b = positions.get(e.id);
+    for (const dep of e.dependencies) {
+      const a = positions.get(dep);
+      if (!a) continue;
+      root.append(
+        make('line', {
+          x1: a.x,
+          y1: a.y + 8,
+          x2: b.x,
+          y2: b.y - 10,
+          class: 'causal-edge',
+          'marker-end': 'url(#causal-arrow)',
+        }),
+      );
+    }
+  }
+  for (const e of state.events) {
+    const p = positions.get(e.id),
+      group = make('g', {
+        class: 'trace-event',
+        'data-event': e.id,
+        role: 'button',
+        tabindex: 0,
+        'aria-label': `Select ${e.id}, ${e.node}, ${e.kind}`,
+      });
+    group.append(
+      make('circle', { cx: p.x, cy: p.y, r: 9 }),
+      make('text', { x: p.x + 16, y: p.y + 4 }, `${e.id} ${e.kind}`),
+      make('title', {}, `${e.label} · [${e.vector.join(', ')}] · Lamport ${e.lamport}`),
+    );
+    const choose = () => {
+      $('event-' + nextComparison).value = e.id;
+      nextComparison = nextComparison === 'a' ? 'b' : 'a';
+      $('pick-next').textContent = `Click an event to set ${nextComparison.toUpperCase()}`;
+      renderComparison();
+    };
+    group.addEventListener('click', choose);
+    group.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        choose();
+      }
+    });
+    root.append(group);
+  }
+}
 function renderComparison() {
+  for (const event of $('sequence').querySelectorAll('[data-event]')) {
+    event.classList.toggle('picked-a', event.dataset.event === $('event-a').value);
+    event.classList.toggle('picked-b', event.dataset.event === $('event-b').value);
+  }
   if (!$('event-a').value || !$('event-b').value) {
     $('comparison').innerHTML = '<p>Record at least one event to inspect its clock.</p>';
     return;
@@ -104,8 +202,7 @@ function renderMessages(state) {
             : '';
         return `<article class="message"><div><h3><span class="message-id">${m.id}</span>${m.from} → ${m.to}</h3><p>${escape(m.label)}</p><p>Sent at [${m.vector.join(', ')}] · L${m.lamport}</p>${reason ? `<p class="reason">${reason}</p>` : ''}</div><div class="actions"><button data-message="${m.id}" data-action="deliver" ${reason ? 'disabled' : ''} aria-label="Deliver ${m.id}">Deliver →</button><button data-message="${m.id}" data-action="drop" aria-label="Drop ${m.id}">Drop</button></div></article>`;
       })
-      .join('') ||
-    '<p class="empty">The network is quiet.<br>Queue a message to put history in motion.</p>';
+      .join('') || '<p class="empty">No messages in transit.</p>';
   $('blocked').innerHTML = state.blocked
     .map((key) => {
       const [from, to] = key.split('>');
@@ -138,6 +235,7 @@ function render() {
   $('pending-total').textContent = state.messages.filter((m) => m.status === 'pending').length;
   $('partition-total').textContent = state.blocked.length;
   renderNodes(state);
+  renderSequence(state);
   renderMessages(state);
   const ids = state.order.map((id) => [id, id]);
   for (const id of ['from', 'link-from']) select(id, ids);
@@ -149,6 +247,11 @@ function render() {
   renderEvents(state);
   $('export-events').disabled = !state.events.length;
 }
+$('settings-open').addEventListener('click', () => {
+  $('settings-notice').textContent = '';
+  $('settings-panel').showModal();
+});
+$('settings-close').addEventListener('click', () => $('settings-panel').close());
 $('send-form').addEventListener('submit', (event) => {
   event.preventDefault();
   apply({ type: 'send', from: $('from').value, to: $('to').value, label: $('label').value });
