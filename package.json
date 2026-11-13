@@ -1,0 +1,5 @@
+{
+  "name": "causal-post", "version": "1.0.0", "private": true, "type": "module",
+  "scripts": {"test": "node --test", "check": "node --check core.js"},
+  "engines": {"node": ">=22"}
+}
